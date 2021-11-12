@@ -1,0 +1,47 @@
+name: 'Get Artifact From Workflow'
+description: 'Fetches a artifact from a workflow at a specific revision'
+inputs:
+  owner:
+    description: "owner of the repository"
+    required: true
+  repo:
+    description: "repo name"
+    required: true
+  workflow:
+    description: "workflow file name"
+    required: true
+  revision:
+    description: "revision of the workflow in sha"
+    required: true
+  artifact:
+    description: "artifact name"
+    required: true
+  token:
+    description: "github access token"
+    required: true
+runs:
+  using: composite
+  steps:
+  - shell: bash
+    run: |
+      GITHUB_PAT=${{ inputs.token }}
+      OWNER=${{ inputs.owner }}
+      REPO=${{ inputs.repo }}
+      WORKFLOW=${{ inputs.workflow }}
+      SHA=${{ inputs.revision }}
+      ARTIFACT=${{ inputs.artifact }}
+
+      workflow_run=$(curl -s -H "Authorization: token $GITHUB_PAT" "https://api.github.com/repos/$OWNER/$REPO/actions/workflows/$WORKFLOW/runs")
+      artifacts_url=$(echo $workflow_run | jq 'first(.workflow_runs[] | select(.head_sha == "'$SHA'") ) | .artifacts_url' | tr -d '"')
+      if [ -z "$artifacts_url" ]; then
+        echo "No artifacts found"
+        exit 1
+      fi
+      artifacts=$(curl -s -H "Authorization: token $GITHUB_PAT" "$artifacts_url")
+      archive_download_url=$(echo $artifacts | jq '.artifacts[] | select(.name == "'$ARTIFACT'") | .archive_download_url' | tr -d '"')
+      if [ -z "$archive_download_url" ]; then
+        echo "No artifact found"
+        exit 1
+      fi
+      curl -s -O -J -L -H "Authorization: token $GITHUB_PAT" "$archive_download_url"
+      unzip "$ARTIFACT".zip

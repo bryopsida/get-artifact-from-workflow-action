@@ -1,0 +1,30 @@
+name: 'Test Action'
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Test fetching artifact
+    steps:
+      - id: fetch
+        uses: bryopsida/get-active-deployment-action@main
+        with:
+          owner: 'bryopsida'
+          repo: 'actions-playground'
+          environment: 'test'
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - id: get-revision
+        run: |
+          sha=$(echo '${{ steps.fetch.outputs.deployment }}' | jq '.sha')
+          echo "SHA: $sha"
+          echo ::set-output name=sha::$sha
+      - uses: bryopsida/get-artifact-from-workflow-action@main
+        with:
+          owner: 'bryopsida'
+          repo: 'actions-playground'
+          workflow: 'capture-artifacts.yml'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          revision: ${{ steps.get-revision.outputs.sha }}
+          artifact: 'a.version.txt'
+      - run: |
+          version=$(cat a.version.txt)
+          echo $version
